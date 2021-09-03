@@ -1,4 +1,5 @@
 use std::fs;
+use std::env;
 
 use serenity::{
     async_trait,
@@ -10,7 +11,7 @@ mod events;
 mod common;
 use common::*;
 
-// Bot Token
+// Fallback Bot Token
 const TOKEN: &str = "";
 
 struct Handler;
@@ -40,6 +41,12 @@ impl EventHandler for Handler {
 
 #[tokio::main]
 async fn main() {
+    // Use first argument as bot token if present
+    let token = env::args().nth(1).unwrap_or(TOKEN.to_string());
+    if token == "" {
+        panic!("No token provided! Use ./languge_bot <TOKEN>");
+    }
+
     // Load *words* into a vector
     let word_string: String = fs::read_to_string("data/words.txt").expect("Could not read file");
     let words: Vec<String> = word_string
@@ -50,7 +57,7 @@ async fn main() {
         .collect();
     set_words(words);
 
-    let mut client = Client::builder(&TOKEN)
+    let mut client = Client::builder(&token)
         .event_handler(Handler)
         .await
         .expect("Err creating client");
