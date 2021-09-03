@@ -2,57 +2,39 @@ use std::fs;
 
 use serenity::{
     async_trait,
-    model::{channel::Message, gateway::Ready},
+    model::{channel::Message, gateway::Ready, prelude::*},
     prelude::*,
 };
+
+mod events;
+mod common;
+use common::*;
 
 // Bot Token
 const TOKEN: &str = "";
 
-static mut WORDS: Option<Vec<String>> = None;
 struct Handler;
 
 #[async_trait]
 impl EventHandler for Handler {
+    // On User Send Message
     async fn message(&self, ctx: Context, msg: Message) {
-        // Ignore all messages created by bots
-        if msg.author.bot {
-            return;
-        }
+        events::message(ctx, msg).await;
+    }
 
-        let has_word = has_bad_word(&msg.content);
-        if has_word.is_some() {
-            if let Err(why) = msg
-                .channel_id
-                .send_message(&ctx.http, |m| {
-                    m.embed(|e| {
-                        e.title("𝐋𝐀𝐍𝐆𝐔𝐀𝐆𝐄!");
-                        e.description(&format!(
-                            "'{}' is a very bad word!",
-                            capitalize(has_word.unwrap())
-                        ));
-                        e.color(0xE32828);
-                        e
-                    });
-                    m
-                })
-                .await
-            {
-                println!("Error sending message: {:?}", why);
-            }
-        }
-
-        println!(
-            "({}) [{}:{}]: {}",
-            emoji_for_bool(has_word.is_some()),
-            msg.author.name,
-            msg.author.discriminator,
-            msg.content
-        );
+    // On User Edit Message
+    async fn message_update(
+        &self,
+        ctx: Context,
+        _: Option<Message>,
+        _: Option<Message>,
+        event: MessageUpdateEvent,
+    ) {
+        events::message_update(ctx, event).await;
     }
 
     async fn ready(&self, _: Context, ready: Ready) {
-        println!("{}:{} is ready!", ready.user.name, ready.user.discriminator);
+        println!("{}:{} is ready!\n", ready.user.name, ready.user.discriminator);
     }
 }
 
@@ -66,7 +48,7 @@ async fn main() {
         .iter()
         .map(|s| s.replace('\r', "").to_string())
         .collect();
-    unsafe { WORDS = Some(words) };
+    set_words(words);
 
     let mut client = Client::builder(&TOKEN)
         .event_handler(Handler)
@@ -75,31 +57,5 @@ async fn main() {
 
     if let Err(why) = client.start().await {
         println!("Client error: {:?}", why);
-    }
-}
-
-/// Check if a massage contains a bad word
-fn has_bad_word(message: &str) -> Option<&str> {
-    let words = unsafe { WORDS.as_ref().unwrap() };
-    for word in words {
-        if message.contains(word) {
-            return Some(word);
-        }
-    }
-    None
-}
-
-fn emoji_for_bool(b: bool) -> &'static str {
-    if b {
-        return "✅";
-    }
-    "❌"
-}
-
-fn capitalize(s: &str) -> String {
-    let mut c = s.chars();
-    match c.next() {
-        None => String::new(),
-        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
     }
 }
